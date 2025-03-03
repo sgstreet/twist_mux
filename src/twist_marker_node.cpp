@@ -28,23 +28,20 @@
 
 /*
  * @author Enrique Fernandez
- * @author Siegfried Gevatter
  * @author Jeremie Deray
+ * @author Brighten Lee
  */
 
-#include <twist_mux/twist_mux.hpp>
-
-#include <memory>
+#include <rclcpp/rclcpp.hpp>
+#include <twist_mux/twist_marker.hpp>
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
 
-  auto twist_mux_node = std::make_shared<twist_mux::TwistMux>();
+  auto twist_marker_node = std::make_shared<twist_mux::TwistMarkerPublisher>();
 
-  twist_mux_node->init();
-
-  rclcpp::spin(twist_mux_node->get_node_base_interface());
+  rclcpp::spin(twist_marker_node);
 
   rclcpp::shutdown();
 

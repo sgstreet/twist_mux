@@ -59,7 +59,7 @@ class LockTopicHandle;
  * @brief The TwistMux class implements a top-level twist multiplexer module
  * that priorize different velocity command topic inputs according to locks.
  */
-class TwistMux : public rclcpp::Node
+class TwistMux
 {
 public:
   template<typename T>
@@ -69,8 +69,68 @@ public:
   using velocity_stamped_topic_container = handle_container<VelocityStampedTopicHandle>;
   using lock_topic_container = handle_container<LockTopicHandle>;
 
-  TwistMux();
+  explicit TwistMux();
+  explicit TwistMux(const rclcpp::NodeOptions& options);
   ~TwistMux() = default;
+
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const
+  {
+	  return node->get_node_base_interface();
+  }
+
+  rclcpp::node_interfaces::NodeClockInterface::SharedPtr get_node_clock_interface()
+  {
+	  return node->get_node_clock_interface();
+  }
+
+  rclcpp::node_interfaces::NodeLoggingInterface::SharedPtr get_node_logging_interface()
+  {
+	  return node->get_node_logging_interface();
+  }
+
+  rclcpp::node_interfaces::NodeParametersInterface::SharedPtr get_node_parameters_interface()
+  {
+	  return node->get_node_parameters_interface();
+  }
+
+  rclcpp::node_interfaces::NodeTimersInterface::SharedPtr get_node_timers_interface()
+  {
+	  return node->get_node_timers_interface();
+  }
+
+  rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr get_node_topics_interface()
+  {
+	  return node->get_node_topics_interface();
+  }
+
+  rclcpp::Time now() const
+  {
+	  return node->now();
+  }
+
+  rclcpp::Logger get_logger() const
+  {
+	  return node->get_logger();
+  }
+
+  template<
+    typename MessageT,
+    typename CallbackT,
+    typename AllocatorT = std::allocator<void>,
+    typename SubscriptionT = rclcpp::Subscription<MessageT, AllocatorT>,
+    typename MessageMemoryStrategyT = typename SubscriptionT::MessageMemoryStrategyType
+  >
+  std::shared_ptr<SubscriptionT>
+  create_subscription(
+    const std::string & topic_name,
+    const rclcpp::QoS & qos,
+    CallbackT && callback,
+    const rclcpp::SubscriptionOptionsWithAllocator<AllocatorT> & options = rclcpp::SubscriptionOptionsWithAllocator<AllocatorT>(),
+    typename MessageMemoryStrategyT::SharedPtr msg_mem_strat = MessageMemoryStrategyT::create_default()
+  )
+  {
+	  return node->create_subscription<MessageT>(topic_name, qos, callback, options, msg_mem_strat);
+  }
 
   void init();
 
@@ -115,6 +175,9 @@ protected:
 
   std::shared_ptr<diagnostics_type> diagnostics_;
   std::shared_ptr<status_type> status_;
+
+private:
+  rclcpp::Node::SharedPtr node;
 };
 
 }  // namespace twist_mux

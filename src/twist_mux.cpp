@@ -69,20 +69,34 @@ namespace twist_mux
 constexpr std::chrono::duration<int64_t> TwistMux::DIAGNOSTICS_PERIOD;
 
 TwistMux::TwistMux()
-: Node("twist_mux", "",
-    rclcpp::NodeOptions().allow_undeclared_parameters(
-      true).automatically_declare_parameters_from_overrides(true))
 {
+	// Setup the options nad create the node
+	rclcpp::NodeOptions node_options;
+	node_options.allow_undeclared_parameters(true);
+	node_options.automatically_declare_parameters_from_overrides(true);
+	node = std::make_shared<rclcpp::Node>("twist_mux", node_options);
+}
+
+TwistMux::TwistMux(const rclcpp::NodeOptions& options)
+{
+	// Setup the options nad create the node
+	rclcpp::NodeOptions node_options = options;
+	node_options.allow_undeclared_parameters(true);
+	node_options.automatically_declare_parameters_from_overrides(true);
+	node = std::make_shared<rclcpp::Node>("twist_mux", node_options);
+
+	// Now initialize the mux
+	init();
 }
 
 void TwistMux::init()
 {
   // Get use stamped parameter
   bool use_stamped = true;
-  this->declare_parameter("use_stamped", use_stamped);
+  node->declare_parameter("use_stamped", use_stamped);
 
-  auto nh = std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node *) {});
-  fetch_param(nh, "use_stamped", use_stamped);
+//  auto nh = std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node *) {});
+  fetch_param(node, "use_stamped", use_stamped);
 
   /// Get topics and locks:
   if(use_stamped)
@@ -102,14 +116,14 @@ void TwistMux::init()
   if(use_stamped)
   {
     cmd_pub_stamped_ =
-      this->create_publisher<geometry_msgs::msg::TwistStamped>(
+      node->create_publisher<geometry_msgs::msg::TwistStamped>(
         "cmd_vel_out",
         rclcpp::QoS(rclcpp::KeepLast(1)));
   }
   else
   {
     cmd_pub_ =
-      this->create_publisher<geometry_msgs::msg::Twist>(
+      node->create_publisher<geometry_msgs::msg::Twist>(
       "cmd_vel_out",
       rclcpp::QoS(rclcpp::KeepLast(1)));
   }
@@ -122,7 +136,7 @@ void TwistMux::init()
   status_->lock_hs = lock_hs_;
   status_->use_stamped = use_stamped;
 
-  diagnostics_timer_ = this->create_wall_timer(
+  diagnostics_timer_ = node->create_wall_timer(
     DIAGNOSTICS_PERIOD, [this]() -> void {
       updateDiagnostics();
     });
@@ -131,9 +145,9 @@ void TwistMux::init()
 void TwistMux::updateDiagnostics()
 {
   status_->priority = getLockPriority();
-  RCLCPP_DEBUG(get_logger(), "updateDiagnostics: lol");
+  RCLCPP_DEBUG(node->get_logger(), "updateDiagnostics: lol");
   diagnostics_->updateStatus(status_);
-  RCLCPP_DEBUG(get_logger(), "returned from updateStatus");
+  RCLCPP_DEBUG(node->get_logger(), "returned from updateStatus");
 }
 
 void TwistMux::publishTwist(const geometry_msgs::msg::Twist::ConstSharedPtr & msg)
@@ -149,32 +163,32 @@ void TwistMux::publishTwistStamped(const geometry_msgs::msg::TwistStamped::Const
 template<typename T>
 void TwistMux::getTopicHandles(const std::string & param_name, std::list<T> & topic_hs)
 {
-  RCLCPP_DEBUG(get_logger(), "getTopicHandles: %s", param_name.c_str());
+  RCLCPP_DEBUG(node->get_logger(), "getTopicHandles: %s", param_name.c_str());
 
-  rcl_interfaces::msg::ListParametersResult list = list_parameters({param_name}, 10);
+  rcl_interfaces::msg::ListParametersResult list = node->list_parameters({param_name}, 10);
 
   try {
     for (auto prefix : list.prefixes) {
-      RCLCPP_DEBUG(get_logger(), "Prefix: %s", prefix.c_str());
+      RCLCPP_DEBUG(node->get_logger(), "Prefix: %s", prefix.c_str());
 
       std::string topic;
       double timeout = 0;
       int priority = 0;
 
-      auto nh = std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node *) {});
+//      auto nh = std::shared_ptr<rclcpp::Node>(this, [](rclcpp::Node *) {});
 
-      fetch_param(nh, prefix + ".topic", topic);
-      fetch_param(nh, prefix + ".timeout", timeout);
-      fetch_param(nh, prefix + ".priority", priority);
+      fetch_param(node, prefix + ".topic", topic);
+      fetch_param(node, prefix + ".timeout", timeout);
+      fetch_param(node, prefix + ".priority", priority);
 
-      RCLCPP_DEBUG(get_logger(), "Retrieved topic: %s", topic.c_str());
-      RCLCPP_DEBUG(get_logger(), "Listed prefix: %.2f", timeout);
-      RCLCPP_DEBUG(get_logger(), "Listed prefix: %d", priority);
+      RCLCPP_DEBUG(node->get_logger(), "Retrieved topic: %s", topic.c_str());
+      RCLCPP_DEBUG(node->get_logger(), "Listed prefix: %.2f", timeout);
+      RCLCPP_DEBUG(node->get_logger(), "Listed prefix: %d", priority);
 
       topic_hs.emplace_back(prefix, topic, std::chrono::duration<double>(timeout), priority, this);
     }
   } catch (const ParamsHelperException & e) {
-    RCLCPP_FATAL(get_logger(), "Error parsing params '%s':\n\t%s", param_name.c_str(), e.what());
+    RCLCPP_FATAL(node->get_logger(), "Error parsing params '%s':\n\t%s", param_name.c_str(), e.what());
     throw e;
   }
 }
@@ -194,7 +208,7 @@ int TwistMux::getLockPriority()
     }
   }
 
-  RCLCPP_DEBUG(get_logger(), "Priority = %d.", static_cast<int>(priority));
+  RCLCPP_DEBUG(node->get_logger(), "Priority = %d.", static_cast<int>(priority));
 
   return priority;
 }
@@ -245,3 +259,7 @@ bool TwistMux::hasPriorityStamped(const VelocityStampedTopicHandle & twist)
 }
 
 }  // namespace twist_mux
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(twist_mux::TwistMux);
+

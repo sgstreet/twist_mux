@@ -26,153 +26,51 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-/*
- * @author Enrique Fernandez
- * @author Jeremie Deray
- * @author Brighten Lee
- */
+#include <twist_mux/twist_marker.hpp>
 
-#include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/twist.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
-#include <visualization_msgs/msg/marker.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
-
-#include <memory>
-#include <string>
-
-class TwistMarker
+twist_mux::TwistMarkerPublisher::TwistMarkerPublisher()
+: TwistMarkerPublisher(rclcpp::NodeOptions())
 {
-public:
-  TwistMarker(std::string & frame_id, double scale, double z)
-  : frame_id_(frame_id), scale_(scale), z_(z)
-  {
-    // ID and type:
-    marker_.id = 0;
-    marker_.type = visualization_msgs::msg::Marker::ARROW;
-
-    // Frame ID:
-    marker_.header.frame_id = frame_id_;
-
-    // Pre-allocate points for setting the arrow with the twist:
-    marker_.points.resize(2);
-
-    // Vertical position:
-    marker_.pose.position.z = z_;
-
-    // Scale:
-    marker_.scale.x = 0.05 * scale_;
-    marker_.scale.y = 2 * marker_.scale.x;
-
-    // Color:
-    marker_.color.a = 1.0;
-    marker_.color.r = 0.0;
-    marker_.color.g = 1.0;
-    marker_.color.b = 0.0;
-
-    // Error when all points are zero:
-    marker_.points[1].z = 0.01;
-  }
-
-  void update(const geometry_msgs::msg::Twist & twist)
-  {
-    using std::abs;
-
-    marker_.points[1].x = twist.linear.x;
-
-    if (abs(twist.linear.y) > abs(twist.angular.z)) {
-      marker_.points[1].y = twist.linear.y;
-    } else {
-      marker_.points[1].y = twist.angular.z;
-    }
-  }
-
-  const visualization_msgs::msg::Marker & getMarker()
-  {
-    return marker_;
-  }
-
-private:
-  visualization_msgs::msg::Marker marker_;
-
-  std::string frame_id_;
-  double scale_;
-  double z_;
-};
-
-class TwistMarkerPublisher : public rclcpp::Node
-{
-public:
-  TwistMarkerPublisher()
-  : Node("twist_marker")
-  {
-    std::string frame_id;
-    double scale;
-    bool use_stamped = true;
-    double z;
-
-    this->declare_parameter("frame_id", "base_footprint");
-    this->declare_parameter("scale", 1.0);
-    this->declare_parameter("use_stamped", true);
-    this->declare_parameter("vertical_position", 2.0);
-
-    this->get_parameter<std::string>("frame_id", frame_id);
-    this->get_parameter<double>("scale", scale);
-    this->get_parameter<bool>("use_stamped", use_stamped);
-    this->get_parameter<double>("vertical_position", z);
-
-    marker_ = std::make_shared<TwistMarker>(frame_id, scale, z);
-
-    if (use_stamped)
-    {
-      sub_stamped_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
-        "twist", rclcpp::SystemDefaultsQoS(),
-        std::bind(&TwistMarkerPublisher::callback_stamped, this, std::placeholders::_1));
-    }
-    else
-    {
-      sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
-        "twist", rclcpp::SystemDefaultsQoS(),
-        std::bind(&TwistMarkerPublisher::callback, this, std::placeholders::_1));
-    }
-
-    pub_ =
-      this->create_publisher<visualization_msgs::msg::Marker>(
-      "marker",
-      rclcpp::QoS(rclcpp::KeepLast(1)));
-  }
-
-  void callback(const geometry_msgs::msg::Twist::ConstSharedPtr twist)
-  {
-    marker_->update(*twist);
-
-    pub_->publish(marker_->getMarker());
-  }
-
-  void callback_stamped(const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist)
-  {
-    marker_->update(twist->twist);
-
-    pub_->publish(marker_->getMarker());
-  }
-
-private:
-  rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr sub_;
-  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr sub_stamped_;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_;
-
-  std::shared_ptr<TwistMarker> marker_ = nullptr;
-};
-
-int main(int argc, char * argv[])
-{
-  rclcpp::init(argc, argv);
-
-  auto twist_mux_node = std::make_shared<TwistMarkerPublisher>();
-
-  rclcpp::spin(twist_mux_node);
-
-  rclcpp::shutdown();
-
-  return EXIT_SUCCESS;
 }
+
+twist_mux::TwistMarkerPublisher::TwistMarkerPublisher(const rclcpp::NodeOptions& options)
+: Node("twist_marker", options)
+{
+  std::string frame_id;
+  double scale;
+  bool use_stamped = true;
+  double z;
+
+  this->declare_parameter("frame_id", "base_footprint");
+  this->declare_parameter("scale", 1.0);
+  this->declare_parameter("use_stamped", true);
+  this->declare_parameter("vertical_position", 2.0);
+
+  this->get_parameter<std::string>("frame_id", frame_id);
+  this->get_parameter<double>("scale", scale);
+  this->get_parameter<bool>("use_stamped", use_stamped);
+  this->get_parameter<double>("vertical_position", z);
+
+  marker_ = std::make_shared<TwistMarker>(frame_id, scale, z);
+
+  if (use_stamped)
+  {
+	sub_stamped_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
+	  "twist", rclcpp::SystemDefaultsQoS(),
+	  std::bind(&TwistMarkerPublisher::callback_stamped, this, std::placeholders::_1));
+  }
+  else
+  {
+	sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+	  "twist", rclcpp::SystemDefaultsQoS(),
+	  std::bind(&TwistMarkerPublisher::callback, this, std::placeholders::_1));
+  }
+
+  pub_ =
+	this->create_publisher<visualization_msgs::msg::Marker>(
+	"marker",
+	rclcpp::QoS(rclcpp::KeepLast(1)));
+}
+
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMPONENTS_REGISTER_NODE(twist_mux::TwistMarkerPublisher);
